@@ -1,3 +1,4 @@
+// stores/auth-store.ts (update)
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session, User } from '@supabase/supabase-js';
 import { create } from 'zustand';
@@ -13,6 +14,7 @@ interface AuthState {
   signOut: () => Promise<void>;
   setSession: (session: Session | null) => void;
   setUser: (user: User | null) => void;
+  setLoading: (loading: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -62,6 +64,7 @@ export const useAuthStore = create<AuthState>()(
 
       setSession: (session: Session | null) => set({ session }),
       setUser: (user: User | null) => set({ user }),
+      setLoading: (loading: boolean) => set({ isLoading: loading }),
     }),
     {
       name: 'auth-storage',
@@ -69,3 +72,9 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+supabase.auth.onAuthStateChange((event, session) => {
+  useAuthStore.getState().setSession(session);
+  useAuthStore.getState().setUser(session?.user ?? null);
+  useAuthStore.getState().setLoading(false);
+});
