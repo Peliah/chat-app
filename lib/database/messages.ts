@@ -1,55 +1,165 @@
-// lib/database/messages.ts
+import { Message } from '@/types/message-type';
 import { supabase } from '../supabase/client';
 
 export const messages = {
-  // Get messages for a conversation
-  getMessages: async (conversationId: string, limit = 50) => {
+  async getMessages(conversationId: string): Promise<Message[]> {
     const { data, error } = await supabase
       .from('messages')
       .select(`
         *,
         profiles:user_id (
-          id,
-          email,
           username,
+          email,
           avatar_url
         )
       `)
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+      .order('created_at', { ascending: true });
 
-    if (error) throw error;
-    return data;
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    // Transform the data to ensure no null values
+    return (data || []).map(message => ({
+      id: message.id,
+      content: message.content || '',
+      conversation_id: message.conversation_id || '',
+      created_at: message.created_at || new Date().toISOString(),
+      updated_at: message.updated_at || new Date().toISOString(),
+      user_id: message.user_id || '',
+      status: message.status || 'sent',
+      reactions: message.reactions || {},
+      attachments: message.attachments || [],
+      profiles: message.profiles ? {
+        username: message.profiles.username,
+        email: message.profiles.email || '',
+        avatar_url: message.profiles.avatar_url
+      } : undefined
+    })) as Message[];
   },
 
-  // Send a new message
-  sendMessage: async (conversationId: string, userId: string, content: string) => {
+  // Send a message
+  async sendMessage(conversationId: string, userId: string, content: string, attachments?: any[]): Promise<Message> {
     const { data, error } = await supabase
       .from('messages')
       .insert({
         conversation_id: conversationId,
         user_id: userId,
         content,
+        status: 'sent',
+        attachments: attachments || null,
       })
       .select(`
         *,
         profiles:user_id (
-          id,
-          email,
           username,
+          email,
           avatar_url
         )
       `)
       .single();
 
-    if (error) throw error;
-    return data;
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    // Transform the data to ensure no null values
+    return {
+      id: data.id,
+      content: data.content || '',
+      conversation_id: data.conversation_id || '',
+      created_at: data.created_at || new Date().toISOString(),
+      updated_at: data.updated_at || new Date().toISOString(),
+      user_id: data.user_id || '',
+      status: data.status || 'sent',
+      reactions: data.reactions || {},
+      attachments: data.attachments || [],
+      profiles: data.profiles ? {
+        username: data.profiles.username,
+        email: data.profiles.email || '',
+        avatar_url: data.profiles.avatar_url
+      } : undefined
+    } as Message;
   },
 
-  // Subscribe to new messages in a conversation
-  subscribeToMessages: (conversationId: string, callback: (message: any) => void) => {
-    const channel = supabase
+  // Rest of the functions remain the same...
+  // Update message status
+  async updateMessageStatus(messageId: string, status: 'delivered' | 'read') {
+    const { error } = await supabase
+      .from('messages')
+      .update({ status })
+      .eq('id', messageId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  },
+
+  // Add reaction to a message
+  async addReaction(messageId: string, userId: string, emoji: string) {
+    // First get the current reactions
+    const { data: message } = await supabase
+      .from('messages')
+      .select('reactions')
+      .eq('id', messageId)
+      .single();
+
+    const currentReactions = message?.reactions || {};
+
+    // Add the reaction
+    if (!currentReactions[emoji]) {
+      currentReactions[emoji] = [userId];
+    } else if (!currentReactions[emoji].includes(userId)) {
+      currentReactions[emoji].push(userId);
+    }
+
+    // Update the message
+    const { error } = await supabase
+      .from('messages')
+      .update({ reactions: currentReactions })
+      .eq('id', messageId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  },
+
+  // Remove reaction from a message
+  async removeReaction(messageId: string, userId: string, emoji: string) {
+    // First get the current reactions
+    const { data: message } = await supabase
+      .from('messages')
+      .select('reactions')
+      .eq('id', messageId)
+      .single();
+
+    const currentReactions = message?.reactions || {};
+
+    // Remove the reaction
+    if (currentReactions[emoji]) {
+      currentReactions[emoji] = currentReactions[emoji].filter(id => id !== userId);
+
+      // If no more reactions for this emoji, remove the key
+      if (currentReactions[emoji].length === 0) {
+        delete currentReactions[emoji];
+      }
+    }
+
+    // Update the message
+    const { error } = await supabase
+      .from('messages')
+      .update({ reactions: currentReactions })
+      .eq('id', messageId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  },
+
+  // Subscribe to messages for a conversation
+  subscribeToMessages(conversationId: string, callback: (message: Message) => void) {
+    const subscription = supabase
       .channel(`messages:${conversationId}`)
       .on(
         'postgres_changes',
@@ -59,53 +169,47 @@ export const messages = {
           table: 'messages',
           filter: `conversation_id=eq.${conversationId}`,
         },
-        (payload) => {
+        async (payload) => {
           // Get the full message with profile data
-          supabase
+          const { data } = await supabase
             .from('messages')
             .select(`
               *,
               profiles:user_id (
-                id,
-                email,
                 username,
+                email,
                 avatar_url
               )
             `)
             .eq('id', payload.new.id)
-            .single()
-            .then(({ data }) => {
-              if (data) callback(data);
-            });
+            .single();
+
+          if (data) {
+            // Transform the data to ensure no null values
+            const message: Message = {
+              id: data.id,
+              content: data.content || '',
+              conversation_id: data.conversation_id || '',
+              created_at: data.created_at || new Date().toISOString(),
+              updated_at: data.updated_at || new Date().toISOString(),
+              user_id: data.user_id || '',
+              status: data.status || 'sent',
+              reactions: data.reactions || {},
+              attachments: data.attachments || [],
+              profiles: data.profiles ? {
+                username: data.profiles.username,
+                email: data.profiles.email || '',
+                avatar_url: data.profiles.avatar_url
+              } : undefined
+            };
+            callback(message);
+          }
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
-    };
-  },
-
-  // Subscribe to message updates (for read receipts, edits, etc.)
-  subscribeToMessageUpdates: (conversationId: string, callback: (message: any) => void) => {
-    const channel = supabase
-      .channel(`message-updates:${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        (payload) => {
-          callback(payload.new);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(subscription);
     };
   },
 };
