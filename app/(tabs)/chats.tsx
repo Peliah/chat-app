@@ -3,7 +3,7 @@ import { useConversations } from '@/hooks/use-conversations';
 import { colors, spacing, typography } from '@/lib/constants/colors';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRouter } from 'expo-router';
-import { Plus } from 'lucide-react-native';
+import { Crown, Plus } from 'lucide-react-native';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function ChatsScreen() {
@@ -58,6 +58,12 @@ export default function ChatsScreen() {
   return (
     <Container>
       <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.newChatButton}
+          onPress={() => router.push('/subscription')}
+        >
+          <Crown size={24} color={colors.primary} />
+        </TouchableOpacity>
         <Text style={styles.title}>My Chats</Text>
         <TouchableOpacity
           style={styles.newChatButton}

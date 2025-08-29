@@ -1,3 +1,4 @@
+import { useSubscriptionStore } from '@/stores/subscription-store';
 import { useCallback, useEffect, useState } from 'react';
 import { messages } from '../lib/database/messages';
 import { reactions } from '../lib/database/reactions';
@@ -38,11 +39,15 @@ export function useMessages(conversationId: string) {
 
     const sendMessage = useCallback(async (content: string) => {
         if (!user) throw new Error('User not authenticated');
+        const { canSendMessage, incrementMessageCount } = useSubscriptionStore.getState();
 
+        if (!canSendMessage()) {
+            throw new Error('MESSAGE_LIMIT_REACHED');
+        }
         try {
             const newMessage = await messages.sendMessage(conversationId, user.id, content);
             console.log(newMessage);
-
+            incrementMessageCount();
 
             // Add empty reactions array to new message
             const messageWithReactions = { ...newMessage, reactions: [] };

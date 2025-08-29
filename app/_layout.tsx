@@ -54,7 +54,8 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="auth" options={{ headerShown: false }} />
       <Stack.Screen name="chat-room/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="subscription/gate" options={{ headerShown: false }} />
+      <Stack.Screen name="subscription/index" options={{ title: 'Subscription' }} />
+      <Stack.Screen name="subscription/gate" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="search/search" options={{ headerShown: false }} />
     </Stack>
   );

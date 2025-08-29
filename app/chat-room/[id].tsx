@@ -1,16 +1,20 @@
 import { MessageInput } from '@/components/chat/message-input';
 import { MessageItem } from '@/components/chat/message-item';
 import { TypingIndicator } from '@/components/chat/typing-indicator';
+import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { Container } from '@/components/ui/container';
 import { useMessages } from '@/hooks/use-messages';
+import { useSubscription } from '@/hooks/use-subscription';
 import { colors, spacing } from '@/lib/constants/colors';
 import { useAuthStore } from '@/stores/auth-store';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text } from 'react-native';
 
 export default function ChatRoomScreen() {
   const { id } = useLocalSearchParams();
+  const router = useRouter();
+  const { hasReachedLimit } = useSubscription();
   const {
     messages,
     isLoading,
@@ -25,7 +29,11 @@ export default function ChatRoomScreen() {
     try {
       await sendMessage(content);
     } catch (error) {
-      console.error('Failed to send message:', error);
+      if (typeof error === 'object' && error !== null && 'message' in error && (error as any).message === 'MESSAGE_LIMIT_REACHED') {
+        router.push('/subscription/gate');
+      } else {
+        console.error('Failed to send message:', error);
+      }
     }
   };
 
@@ -55,37 +63,40 @@ export default function ChatRoomScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      <FlatList
-        data={messages}
-        renderItem={({ item }) => (
-          <MessageItem
-            message={item}
-            isOwn={item.user_id === user?.id}
-            onReaction={handleReaction}
-          />
-        )}
-        keyExtractor={(item, index) => item.id ? item.id.toString() : `temp-${index}`}
-        contentContainerStyle={styles.messagesList}
-        inverted={false}
-        ListHeaderComponent={
-          <TypingIndicator
-            users={typingUsers}
-            isVisible={typingUsers.length > 0}
-          />
-        }
-      />
+    <>
+      {hasReachedLimit && <SubscriptionGate />}
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        <FlatList
+          data={messages}
+          renderItem={({ item }) => (
+            <MessageItem
+              message={item}
+              isOwn={item.user_id === user?.id}
+              onReaction={handleReaction}
+            />
+          )}
+          keyExtractor={(item, index) => item.id ? item.id.toString() : `temp-${index}`}
+          contentContainerStyle={styles.messagesList}
+          inverted={false}
+          ListHeaderComponent={
+            <TypingIndicator
+              users={typingUsers}
+              isVisible={typingUsers.length > 0}
+            />
+          }
+        />
 
-      <MessageInput
-        onSendMessage={handleSendMessage}
-        onTypingStart={() => setTyping(true)}
-        onTypingEnd={() => setTyping(false)}
-      />
-    </KeyboardAvoidingView>
+        <MessageInput
+          onSendMessage={handleSendMessage}
+          onTypingStart={() => setTyping(true)}
+          onTypingEnd={() => setTyping(false)}
+        />
+      </KeyboardAvoidingView>
+    </>
   );
 }
 
