@@ -35,7 +35,7 @@ export default function ChatsScreen() {
     <Container>
       <View style={styles.header}>
         <Text style={styles.title}>My Chats</Text>
-        <TouchableOpacity style={styles.newChatButton}>
+        <TouchableOpacity style={styles.newChatButton} onPress={() => router.push('/search/search')}>
           <Plus size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>

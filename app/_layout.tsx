@@ -26,7 +26,7 @@ function RootLayoutNav() {
 
     const inAuthGroup = segments[0] === 'auth';
     const inTabsGroup = segments[0] === '(tabs)';
-    
+
     // Only navigate if we're not already on the correct screen
     if (!session && !inAuthGroup) {
       router.replace('/auth/login');
@@ -49,6 +49,7 @@ function RootLayoutNav() {
       <Stack.Screen name="auth" options={{ headerShown: false }} />
       <Stack.Screen name="chat-room/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="subscription/gate" options={{ headerShown: false }} />
+      <Stack.Screen name="search/search" options={{ headerShown: false }} />
     </Stack>
   );
 }

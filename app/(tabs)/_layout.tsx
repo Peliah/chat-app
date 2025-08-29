@@ -1,7 +1,7 @@
 import { colors } from '@/lib/constants/colors';
 import { useAuthStore } from '@/stores/auth-store';
 import { Tabs, useRouter } from 'expo-router';
-import { MessageCircle } from 'lucide-react-native';
+import { HomeIcon, MessageCircle } from 'lucide-react-native';
 
 export default function TabsLayout() {
   const { signOut } = useAuthStore();
@@ -36,9 +36,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Chats',
+          title: 'Home',
           tabBarIcon: ({ color, size }) => (
-            <MessageCircle size={size} color={color} />
+            <HomeIcon size={size} color={color} />
           ),
         }}
       />

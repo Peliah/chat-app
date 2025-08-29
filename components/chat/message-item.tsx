@@ -1,29 +1,10 @@
 import { colors, spacing, typography } from '@/lib/constants/colors';
+import { Message } from '@/types/message-type';
 import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { FileAttachment } from './file-attachment';
 import { MessageReactionPicker } from './message-reaction-picker';
 import { MessageReactions } from './message-reactions';
-
-export interface Message {
-    id: string;
-    content: string;
-    created_at: string;
-    user_id: string;
-    status?: 'sent' | 'delivered' | 'read';
-    reactions?: { [emoji: string]: string[] };
-    attachments?: Array<{
-        id: string;
-        url: string;
-        type: 'image' | 'document';
-        name?: string;
-    }>;
-    profiles?: {
-        username?: string;
-        email?: string;
-        avatar_url?: string;
-    };
-}
 
 interface MessageItemProps {
     message: Message;

@@ -28,6 +28,37 @@ export const conversations = {
     return data;
   },
 
+  // Create a new conversation
+  createConversation: async (name: string | null, isGroup: boolean, userId: string, memberIds: string[]) => {
+    // First create the conversation
+    const { data: conversationData, error: conversationError } = await supabase
+      .from('conversations')
+      .insert({
+        name,
+        is_group: isGroup,
+        created_by: userId,
+      })
+      .select()
+      .single();
+
+    if (conversationError) throw conversationError;
+
+    // Add all members to the conversation (including the creator)
+    const allMembers = [...new Set([userId, ...memberIds])]; // Ensure no duplicates
+    const { error: membersError } = await supabase
+      .from('conversation_members')
+      .insert(
+        allMembers.map(memberId => ({
+          conversation_id: conversationData.id,
+          user_id: memberId,
+        }))
+      );
+
+    if (membersError) throw membersError;
+
+    return conversationData;
+  },
+
   // Subscribe to conversation updates
   subscribeToConversations: (userId: string, callback: (conversation: any) => void) => {
     const channel = supabase
