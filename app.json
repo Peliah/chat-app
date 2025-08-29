@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "chat-app",
-    "slug": "chat-app",
+    "slug": "new-chat-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -46,6 +46,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a158b8b6-5c52-4a90-87ab-282badb1fcd3"
+      }
+    },
+    "owner": "peliah"
   }
 }
