@@ -1,76 +1,261 @@
 import { Container } from '@/components/ui/container';
-import { useUserSearch } from '@/hooks/use-user-search';
 import { colors, spacing, typography } from '@/lib/constants/colors';
+import { supabase } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/auth-store';
-import { useConversationStore } from '@/stores/conversation-store';
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Search, User } from 'lucide-react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-export function SearchScreen() {
+export default function SearchScreen() {
     const [query, setQuery] = useState('');
-    const { users, isLoading, error, searchUsers } = useUserSearch();
+    const [results, setResults] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
+    const router = useRouter();
     const { user } = useAuthStore();
-    const { createConversation } = useConversationStore();
 
-    const handleSearch = (text: string) => {
-        setQuery(text);
-        searchUsers(text);
-    };
+    // const searchUsers = useCallback(async (searchQuery: string) => {
+    //     if (!searchQuery.trim()) {
+    //         setResults([]);
+    //         return;
+    //     }
 
-    const handleUserPress = async (selectedUser: any) => {
+    //     if (!user?.id) {
+    //         setIsSearching(false);
+    //         setResults([]);
+    //         return;
+    //     }
+    //     setIsSearching(true);
+    //     const { data, error } = await supabase
+    //         .from('profiles')
+    //         .select('id, username, email, avatar_url')
+    //         .or(`username.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
+    //         .neq('id', user.id) // Exclude current user
+    //         .limit(10);
+
+    //     if (error) {
+    //         console.error('Error searching users:', error);
+    //     } else {
+    //         setResults(data || []);
+    //     }
+    //     setIsSearching(false);
+    // }, [user]);
+
+    // app/search/search.tsx (final implementation)
+    const searchUsers = useCallback(async (searchQuery: string) => {
+        if (!searchQuery.trim()) {
+            setResults([]);
+            return;
+        }
+
+        setIsSearching(true);
+
         try {
-            // Create a conversation with the selected user
-            const conversation = await createConversation(
-                null, // No name for 1-on-1 conversations
-                false, // is_group = false
-                [selectedUser.id] // Only the selected user
-            );
+            // Try the direct approach first
+            const queryBuilder = supabase
+                .from('profiles')
+                .select('id, username, email, avatar_url')
+                .or(`username.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
+            if (user?.id) {
+                queryBuilder.neq('id', user.id);
+            }
+            const { data, error } = await queryBuilder.limit(10);
 
-            // Navigate to the chat screen
-            router.push(`/chat-room/${conversation.id}`);
+            if (error) {
+                console.error('Direct search failed:', error);
+
+                // Fallback to RPC if direct search fails
+                if (error.message.includes('row-level security')) {
+                    const { data: rpcData, error: rpcError } = await supabase
+                        .rpc('search_users', {
+                            search_query: searchQuery,
+                            current_user_id: user?.id ?? ''
+                        });
+
+                    if (rpcError) {
+                        console.error('RPC search also failed:', rpcError);
+                    } else {
+                        setResults(rpcData || []);
+                    }
+                }
+            } else {
+                setResults(data || []);
+            }
+        } catch (err) {
+            console.error('Unexpected error searching users:', err);
+        } finally {
+            setIsSearching(false);
+        }
+    }, [user]);
+
+    // const startConversation = async (otherUser: any) => {
+    //     if (!user) return;
+
+    //     setIsLoading(true);
+    //     try {
+    //         // Check if conversation already exists
+    //         // 1. Get all conversation IDs for the other user
+    //         const { data: otherUserConversations, error: otherUserConvError } = await supabase
+    //             .from('conversation_members')
+    //             .select('conversation_id')
+    //             .eq('user_id', otherUser.id);
+
+    //         if (otherUserConvError) throw otherUserConvError;
+
+    //         const otherUserConversationIds = (otherUserConversations || [])
+    //             .map((row: any) => row.conversation_id)
+    //             .filter(Boolean);
+
+    //         // 2. Find if the current user is also a member of any of those conversations
+    //         const { data: existingConversations, error: convError } = await supabase
+    //             .from('conversation_members')
+    //             .select('conversation_id')
+    //             .eq('user_id', user.id)
+    //             .in('conversation_id', otherUserConversationIds);
+
+    //         if (convError) throw convError;
+
+    //         let conversationId;
+
+    //         if (existingConversations && existingConversations.length > 0) {
+    //             // Use existing conversation
+    //             conversationId = existingConversations[0].conversation_id;
+    //         } else {
+    //             // Create new conversation
+    //             const { data: newConversation, error: createError } = await supabase
+    //                 .from('conversations')
+    //                 .insert({
+    //                     is_group: false,
+    //                     created_by: user.id,
+    //                 })
+    //                 .select()
+    //                 .single();
+
+    //             if (createError) throw createError;
+
+    //             // Add both users to conversation
+    //             const { error: membersError } = await supabase
+    //                 .from('conversation_members')
+    //                 .insert([
+    //                     { conversation_id: newConversation.id, user_id: user.id },
+    //                     { conversation_id: newConversation.id, user_id: otherUser.id },
+    //                 ]);
+
+    //             if (membersError) throw membersError;
+
+    //             conversationId = newConversation.id;
+    //         }
+
+    //         // Navigate to chat room
+    //         router.push({ pathname: '/chat-room/[id]', params: { id: conversationId } });
+    //     } catch (error) {
+    //         console.error('Error starting conversation:', error);
+    //     } finally {
+    //         setIsLoading(false);
+    //     }
+    // };
+
+    // Update the startConversation function in app/search/search.tsx
+    const startConversation = async (otherUser: any) => {
+        if (!user) return;
+
+        setIsLoading(true);
+        try {
+            // Use a transaction to ensure data consistency
+            const { data: conversationData, error: conversationError } = await supabase
+                .rpc('create_conversation_with_members', {
+                    p_user_id: user.id,
+                    p_other_user_id: otherUser.id
+                });
+
+            if (conversationError) throw conversationError;
+
+            // Navigate to chat room
+            router.push({ pathname: '/chat-room/[id]', params: { id: conversationData } });
         } catch (error) {
-            console.error('Error creating conversation:', error);
+            console.error('Error starting conversation:', error);
+
+            // Fallback method if the RPC fails
+            try {
+                // Create new conversation
+                const { data: newConversation, error: createError } = await supabase
+                    .from('conversations')
+                    .insert({
+                        is_group: false,
+                        created_by: user.id,
+                    })
+                    .select()
+                    .single();
+
+                if (createError) throw createError;
+
+                // Add both users to conversation
+                const { error: membersError } = await supabase
+                    .from('conversation_members')
+                    .insert([
+                        { conversation_id: newConversation.id, user_id: user.id },
+                        { conversation_id: newConversation.id, user_id: otherUser.id },
+                    ]);
+
+                if (membersError) throw membersError;
+
+                // Navigate to chat room
+                router.push({ pathname: '/chat-room/[id]', params: { id: newConversation.id } });
+            } catch (fallbackError) {
+                console.error('Fallback method also failed:', fallbackError);
+            }
+        } finally {
+            setIsLoading(false);
         }
     };
+    const renderUserItem = ({ item }: { item: any }) => (
+        <TouchableOpacity
+            style={styles.userItem}
+            onPress={() => startConversation(item)}
+            disabled={isLoading}
+        >
+            <View style={styles.avatarPlaceholder}>
+                <User size={24} color={colors.text.secondary} />
+            </View>
+
+            <View style={styles.userInfo}>
+                <Text style={styles.username}>{item.username || 'No username'}</Text>
+                <Text style={styles.email}>{item.email}</Text>
+            </View>
+        </TouchableOpacity>
+    );
 
     return (
         <Container>
             <View style={styles.searchContainer}>
+                <Search size={20} color={colors.text.secondary} style={styles.searchIcon} />
                 <TextInput
                     style={styles.searchInput}
+                    placeholder="Search users by username or email..."
                     value={query}
-                    onChangeText={handleSearch}
-                    placeholder="Search users by username or email"
+                    onChangeText={(text) => {
+                        setQuery(text);
+                        searchUsers(text);
+                    }}
                     placeholderTextColor={colors.text.secondary}
                 />
             </View>
 
-            {isLoading && <Text style={styles.statusText}>Loading...</Text>}
-            {error && <Text style={styles.errorText}>{error}</Text>}
+            {isSearching && (
+                <View style={styles.center}>
+                    <ActivityIndicator color={colors.primary} />
+                </View>
+            )}
 
             <FlatList
-                data={users.filter(u => u.id !== user?.id)} // Exclude current user
+                data={results}
+                renderItem={renderUserItem}
                 keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                    <TouchableOpacity style={styles.userItem} onPress={() => handleUserPress(item)}>
-                        {item.avatar_url ? (
-                            <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
-                        ) : (
-                            <View style={styles.avatarPlaceholder}>
-                                <Text style={styles.avatarText}>
-                                    {item.username?.charAt(0) || item.email?.charAt(0) || 'U'}
-                                </Text>
-                            </View>
-                        )}
-                        <View style={styles.userInfo}>
-                            <Text style={styles.username}>{item.username || item.email.split('@')[0]}</Text>
-                            <Text style={styles.email}>{item.email}</Text>
-                        </View>
-                    </TouchableOpacity>
-                )}
                 ListEmptyComponent={
-                    !isLoading && query ? <Text style={styles.statusText}>No users found</Text> : null
+                    !isSearching && query ? (
+                        <Text style={styles.noResults}>No users found</Text>
+                    ) : null
                 }
             />
         </Container>
@@ -79,66 +264,66 @@ export function SearchScreen() {
 
 const styles = StyleSheet.create({
     searchContainer: {
-        padding: spacing.md,
-        borderBottomWidth: 2,
-        borderColor: colors.border,
-    },
-    searchInput: {
+        flexDirection: 'row',
+        alignItems: 'center',
         borderWidth: 2,
         borderColor: colors.border,
-        borderRadius: 4,
-        padding: spacing.sm,
-        ...typography.body,
+        borderRadius: 8,
+        paddingHorizontal: spacing.md,
+        marginBottom: spacing.md,
+        backgroundColor: colors.surface,
+    },
+    searchIcon: {
+        marginRight: spacing.sm,
+    },
+    searchInput: {
+        flex: 1,
+        paddingVertical: spacing.md,
         color: colors.text.primary,
+        fontSize: 16,
     },
     userItem: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: spacing.md,
-        borderBottomWidth: 1,
+        borderWidth: 2,
         borderColor: colors.border,
-    },
-    avatar: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        marginRight: spacing.md,
+        borderRadius: 8,
+        backgroundColor: colors.surface,
+        marginBottom: spacing.sm,
     },
     avatarPlaceholder: {
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: colors.primary,
-        alignItems: 'center',
+        backgroundColor: colors.background,
         justifyContent: 'center',
+        alignItems: 'center',
         marginRight: spacing.md,
-    },
-    avatarText: {
-        color: colors.text.inverted,
-        fontWeight: 'bold',
+        borderWidth: 2,
+        borderColor: colors.border,
     },
     userInfo: {
         flex: 1,
     },
     username: {
         ...typography.body,
-        fontWeight: 'bold',
+        fontWeight: '600',
         color: colors.text.primary,
+        marginBottom: spacing.xs,
     },
     email: {
         ...typography.caption,
         color: colors.text.secondary,
     },
-    statusText: {
-        ...typography.caption,
+    noResults: {
         textAlign: 'center',
-        marginTop: spacing.md,
         color: colors.text.secondary,
+        marginTop: spacing.xl,
     },
-    errorText: {
-        ...typography.caption,
-        textAlign: 'center',
-        marginTop: spacing.md,
-        color: colors.error,
+    center: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: spacing.md,
     },
 });

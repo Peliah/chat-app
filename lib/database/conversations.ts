@@ -1,8 +1,7 @@
-// lib/database/conversations.ts
 import { supabase } from '../supabase/client';
 
 export const conversations = {
-  // Get user's conversations
+  // Get user's conversations with last message and members
   getUserConversations: async (userId: string) => {
     const { data, error } = await supabase
       .from('conversation_members')
@@ -14,9 +13,14 @@ export const conversations = {
           created_at,
           last_message:messages (
             content,
-            created_at,
+            created_at
+          ),
+          members:conversation_members (
             profiles:user_id (
-              username
+              id,
+              username,
+              email,
+              avatar_url
             )
           )
         )
@@ -26,37 +30,6 @@ export const conversations = {
 
     if (error) throw error;
     return data;
-  },
-
-  // Create a new conversation
-  createConversation: async (name: string | null, isGroup: boolean, userId: string, memberIds: string[]) => {
-    // First create the conversation
-    const { data: conversationData, error: conversationError } = await supabase
-      .from('conversations')
-      .insert({
-        name,
-        is_group: isGroup,
-        created_by: userId,
-      })
-      .select()
-      .single();
-
-    if (conversationError) throw conversationError;
-
-    // Add all members to the conversation (including the creator)
-    const allMembers = [...new Set([userId, ...memberIds])]; // Ensure no duplicates
-    const { error: membersError } = await supabase
-      .from('conversation_members')
-      .insert(
-        allMembers.map(memberId => ({
-          conversation_id: conversationData.id,
-          user_id: memberId,
-        }))
-      );
-
-    if (membersError) throw membersError;
-
-    return conversationData;
   },
 
   // Subscribe to conversation updates
@@ -79,9 +52,14 @@ export const conversations = {
               *,
               last_message:messages (
                 content,
-                created_at,
+                created_at
+              ),
+              members:conversation_members (
                 profiles:user_id (
-                  username
+                  id,
+                  username,
+                  email,
+                  avatar_url
                 )
               )
             `)
@@ -110,26 +88,5 @@ export const conversations = {
     };
   },
 
-  // Subscribe to conversation updates (name changes, etc.)
-  subscribeToConversationUpdates: (conversationId: string, callback: (conversation: any) => void) => {
-    const channel = supabase
-      .channel(`conversation-updates:${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'conversations',
-          filter: `id=eq.${conversationId}`,
-        },
-        (payload) => {
-          callback(payload.new);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  },
+  // ... other functions ...
 };

@@ -1,95 +1,144 @@
-import { colors, spacing, typography } from '@/lib/constants/colors';
-import { PinIcon, Send } from 'lucide-react-native';
-import { useState } from 'react';
-import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { colors, spacing } from '@/lib/constants/colors';
+import { Paperclip, Send, Smile } from 'lucide-react-native';
+import { useRef, useState } from 'react';
+import { Keyboard, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface MessageInputProps {
-    onSendMessage: (content: string, attachments?: any[]) => void;
-    onTypingStart: () => void;
-    onTypingEnd: () => void;
+    onSendMessage: (content: string) => Promise<void>;
+    onTypingStart?: () => void;
+    onTypingEnd?: () => void;
+    disabled?: boolean;
 }
 
-export function MessageInput({ onSendMessage, onTypingStart, onTypingEnd }: MessageInputProps) {
+export function MessageInput({ onSendMessage, onTypingStart, onTypingEnd, disabled }: MessageInputProps) {
     const [message, setMessage] = useState('');
-    const [isTyping, setIsTyping] = useState(false);
+    const [isFocused, setIsFocused] = useState(false);
+    const inputRef = useRef<TextInput>(null);
+    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const handleSend = () => {
-        if (message.trim()) {
-            onSendMessage(message);
+    const handleSend = async () => {
+        if (message.trim() && !disabled) {
+            const content = message.trim();
             setMessage('');
-            setIsTyping(false);
-            onTypingEnd();
+            Keyboard.dismiss();
+            await onSendMessage(content);
+
+            // Notify typing ended
+            if (onTypingEnd) {
+                onTypingEnd();
+            }
         }
     };
 
     const handleChangeText = (text: string) => {
         setMessage(text);
 
-        if (text.length > 0 && !isTyping) {
-            setIsTyping(true);
+        // Notify typing started
+        if (text.length > 0 && onTypingStart) {
             onTypingStart();
-        } else if (text.length === 0 && isTyping) {
-            setIsTyping(false);
+        }
+
+        // Clear previous timeout and set new one for typing end
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
+
+        if (text.length > 0 && onTypingEnd) {
+            typingTimeoutRef.current = setTimeout(() => {
+                onTypingEnd();
+            }, 1000); // 1 second after stopping typing
+        }
+    };
+
+    const handleBlur = () => {
+        setIsFocused(false);
+        if (onTypingEnd) {
             onTypingEnd();
         }
     };
 
     return (
-        <View style={styles.container}>
-            <View style={styles.inputContainer}>
-                <TouchableOpacity style={styles.button}>
-                    <PinIcon size={24} color={colors.text.primary} />
-                </TouchableOpacity>
+        <View style={[styles.container, isFocused && styles.containerFocused]}>
+            <TouchableOpacity style={styles.button} disabled={disabled}>
+                <Paperclip size={24} color={colors.text.secondary} />
+            </TouchableOpacity>
 
-                <TextInput
-                    style={styles.input}
-                    value={message}
-                    onChangeText={handleChangeText}
-                    placeholder="Type a message..."
-                    placeholderTextColor={colors.text.secondary}
-                    multiline
-                    maxLength={500}
-                />
+            <TextInput
+                ref={inputRef}
+                style={styles.input}
+                value={message}
+                onChangeText={handleChangeText}
+                placeholder="Type a message..."
+                placeholderTextColor={colors.text.secondary}
+                multiline
+                maxLength={500}
+                editable={!disabled}
+                onFocus={() => setIsFocused(true)}
+                onBlur={handleBlur}
+                onSubmitEditing={handleSend}
+            />
 
-                <TouchableOpacity
-                    onPress={handleSend}
-                    style={[styles.button, !message.trim() && styles.buttonDisabled]}
-                    disabled={!message.trim()}
-                >
-                    <Send size={24} color={message.trim() ? colors.text.primary : colors.text.secondary} />
-                </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.button} disabled={disabled}>
+                <Smile size={24} color={colors.text.secondary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[styles.sendButton, (!message.trim() || disabled) && styles.sendButtonDisabled]}
+                onPress={handleSend}
+                disabled={!message.trim() || disabled}
+            >
+                <Send size={20} color={colors.text.inverted} />
+            </TouchableOpacity>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        borderTopWidth: 2,
-        borderColor: colors.border,
-        backgroundColor: colors.background,
-    },
-    inputContainer: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-end',
         padding: spacing.sm,
+        borderTopWidth: 2,
+        borderTopColor: colors.border,
+        backgroundColor: colors.surface,
+        gap: spacing.sm,
+    },
+    containerFocused: {
+        backgroundColor: colors.background,
     },
     input: {
         flex: 1,
+        minHeight: 40,
+        maxHeight: 120,
         borderWidth: 2,
         borderColor: colors.border,
-        borderRadius: 4,
-        paddingHorizontal: spacing.sm,
-        paddingVertical: spacing.xs,
-        marginHorizontal: spacing.sm,
-        maxHeight: 100,
-        ...typography.body,
+        borderRadius: 20,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        backgroundColor: colors.background,
         color: colors.text.primary,
+        fontSize: 16,
     },
     button: {
-        padding: spacing.xs,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: colors.background,
+        borderWidth: 2,
+        borderColor: colors.border,
     },
-    buttonDisabled: {
+    sendButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: colors.primary,
+    },
+    sendButtonDisabled: {
+        backgroundColor: colors.text.secondary,
         opacity: 0.5,
     },
 });

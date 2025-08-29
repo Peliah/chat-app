@@ -1,51 +1,81 @@
-// app/(tabs)/chats.tsx
+import { Container } from '@/components/ui/container';
+import { useConversations } from '@/hooks/use-conversations';
+import { colors, spacing, typography } from '@/lib/constants/colors';
+import { useAuthStore } from '@/stores/auth-store';
 import { useRouter } from 'expo-router';
 import { Plus } from 'lucide-react-native';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Container } from '../../components/ui/container';
-import { colors, spacing, typography } from '../../lib/constants/colors';
-
-const mockChats = [
-  { id: '1', name: 'John Doe', lastMessage: 'Hey there!', unread: 2 },
-  { id: '2', name: 'Jane Smith', lastMessage: 'How are you?', unread: 0 },
-  { id: '3', name: 'Team Chat', lastMessage: 'Meeting tomorrow', unread: 5 },
-];
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function ChatsScreen() {
   const router = useRouter();
+  const { conversations, isLoading } = useConversations();
+  const { user } = useAuthStore();
 
-  const renderChatItem = ({ item }: { item: typeof mockChats[0] }) => (
+  const getChatName = (conversation: any) => {
+    if (conversation.name) return conversation.name;
+
+    // For one-on-one chats, show the other user's name
+    if (!conversation.is_group && conversation.members) {
+      const otherMember = conversation.members.find((m: any) => m.id !== user?.id);
+      return otherMember?.username || otherMember?.email || 'Unknown User';
+    }
+
+    return 'Group Chat';
+  };
+
+  const getLastMessage = (conversation: any) => {
+    if (conversation.last_message) {
+      return conversation.last_message.content;
+    }
+    return 'No messages yet';
+  };
+
+  const renderChatItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.chatItem}
-      onPress={() => router.push(`/chat-room/${item.id}`)}
+      onPress={() => router.push({ pathname: '/chat-room/[id]', params: { id: item.id } })}
     >
       <View style={styles.chatInfo}>
-        <Text style={styles.chatName}>{item.name}</Text>
-        <Text style={styles.lastMessage}>{item.lastMessage}</Text>
+        <Text style={styles.chatName}>{getChatName(item)}</Text>
+        <Text style={styles.lastMessage}>{getLastMessage(item)}</Text>
       </View>
-      {item.unread > 0 && (
+      {item.unread_count > 0 && (
         <View style={styles.unreadBadge}>
-          <Text style={styles.unreadText}>{item.unread}</Text>
+          <Text style={styles.unreadText}>{item.unread_count}</Text>
         </View>
       )}
     </TouchableOpacity>
   );
 
+  if (isLoading) {
+    return (
+      <Container>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </Container>
+    );
+  }
+
   return (
     <Container>
       <View style={styles.header}>
         <Text style={styles.title}>My Chats</Text>
-        <TouchableOpacity style={styles.newChatButton} onPress={() => router.push('/search/search')}>
+        <TouchableOpacity
+          style={styles.newChatButton}
+          onPress={() => router.push('/search/search')}
+        >
           <Plus size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
       <FlatList
-        data={mockChats}
+        data={conversations}
         renderItem={renderChatItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <Text style={styles.noChats}>No conversations yet. Start a new chat!</Text>
+        }
       />
     </Container>
   );
@@ -109,5 +139,10 @@ const styles = StyleSheet.create({
     color: colors.text.inverted,
     fontSize: 12,
     fontWeight: '600',
+  },
+  noChats: {
+    textAlign: 'center',
+    color: colors.text.secondary,
+    marginTop: spacing.xl,
   },
 });

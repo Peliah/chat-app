@@ -1,16 +1,22 @@
 // app/_layout.tsx (updated)
+import { AuthProvider } from '@/components/auth/auth-provider';
+import { colors } from '@/lib/constants/colors';
+import { notifications } from '@/lib/notifications';
+import { useAuthStore } from '@/stores/auth-store';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { AuthProvider } from '../components/auth/auth-provider';
-import { colors } from '../lib/constants/colors';
-import { useAuthStore } from '../stores/auth-store';
-
 function RootLayoutNav() {
   const { session, isLoading } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
   const [isNavigationReady, setIsNavigationReady] = useState(false);
+
+  useEffect(() => {
+    notifications.registerForPushNotifications();
+    const cleanup = notifications.setupNotificationHandlers();
+    return cleanup;
+  }, []);
 
   // Wait for navigation to be ready
   useEffect(() => {
