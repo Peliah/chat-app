@@ -1,113 +1,95 @@
 import { colors, spacing, typography } from '@/lib/constants/colors';
-import { Send } from 'lucide-react-native';
+import { PinIcon, Send } from 'lucide-react-native';
 import { useState } from 'react';
-import { Keyboard, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface MessageInputProps {
-  onSendMessage: (content: string) => Promise<void>;
-  disabled?: boolean;
+    onSendMessage: (content: string, attachments?: any[]) => void;
+    onTypingStart: () => void;
+    onTypingEnd: () => void;
 }
 
-export function MessageInput({ onSendMessage, disabled = false }: MessageInputProps) {
-  const [message, setMessage] = useState('');
-  const [isSending, setIsSending] = useState(false);
+export function MessageInput({ onSendMessage, onTypingStart, onTypingEnd }: MessageInputProps) {
+    const [message, setMessage] = useState('');
+    const [isTyping, setIsTyping] = useState(false);
 
-  const handleSend = async () => {
-    if (!message.trim() || isSending || disabled) return;
+    const handleSend = () => {
+        if (message.trim()) {
+            onSendMessage(message);
+            setMessage('');
+            setIsTyping(false);
+            onTypingEnd();
+        }
+    };
 
-    const messageToSend = message.trim();
-    setMessage('');
-    setIsSending(true);
-    Keyboard.dismiss();
+    const handleChangeText = (text: string) => {
+        setMessage(text);
 
-    try {
-      await onSendMessage(messageToSend);
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      // Optionally, you could show an error message to the user
-      setMessage(messageToSend); // Restore the message if sending failed
-    } finally {
-      setIsSending(false);
-    }
-  };
+        if (text.length > 0 && !isTyping) {
+            setIsTyping(true);
+            onTypingStart();
+        } else if (text.length === 0 && isTyping) {
+            setIsTyping(false);
+            onTypingEnd();
+        }
+    };
 
-  const handleSubmitEditing = () => {
-    handleSend();
-  };
+    return (
+        <View style={styles.container}>
+            <View style={styles.inputContainer}>
+                <TouchableOpacity style={styles.button}>
+                    <PinIcon size={24} color={colors.text.primary} />
+                </TouchableOpacity>
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          value={message}
-          onChangeText={setMessage}
-          placeholder="Type a message..."
-          placeholderTextColor={colors.text.secondary}
-          multiline
-          maxLength={500}
-          editable={!disabled && !isSending}
-          onSubmitEditing={handleSubmitEditing}
-        />
-        
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            (!message.trim() || isSending || disabled) && styles.sendButtonDisabled
-          ]}
-          onPress={handleSend}
-          disabled={!message.trim() || isSending || disabled}
-        >
-          <Send 
-            size={20} 
-            color={
-              !message.trim() || isSending || disabled 
-                ? colors.text.secondary 
-                : colors.text.inverted
-            } 
-          />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+                <TextInput
+                    style={styles.input}
+                    value={message}
+                    onChangeText={handleChangeText}
+                    placeholder="Type a message..."
+                    placeholderTextColor={colors.text.secondary}
+                    multiline
+                    maxLength={500}
+                />
+
+                <TouchableOpacity
+                    onPress={handleSend}
+                    style={[styles.button, !message.trim() && styles.buttonDisabled]}
+                    disabled={!message.trim()}
+                >
+                    <Send size={24} color={message.trim() ? colors.text.primary : colors.text.secondary} />
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: spacing.md,
-    borderTopWidth: 2,
-    borderTopColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: spacing.sm,
-  },
-  input: {
-    flex: 1,
-    borderWidth: 2,
-    borderColor: colors.border,
-    borderRadius: 20,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingTop: spacing.sm,
-    maxHeight: 100,
-    backgroundColor: colors.background,
-    color: colors.text.primary,
-    ...typography.body,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.border,
-  },
-  sendButtonDisabled: {
-    backgroundColor: colors.background,
-  },
+    container: {
+        borderTopWidth: 2,
+        borderColor: colors.border,
+        backgroundColor: colors.background,
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: spacing.sm,
+    },
+    input: {
+        flex: 1,
+        borderWidth: 2,
+        borderColor: colors.border,
+        borderRadius: 4,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        marginHorizontal: spacing.sm,
+        maxHeight: 100,
+        ...typography.body,
+        color: colors.text.primary,
+    },
+    button: {
+        padding: spacing.xs,
+    },
+    buttonDisabled: {
+        opacity: 0.5,
+    },
 });
