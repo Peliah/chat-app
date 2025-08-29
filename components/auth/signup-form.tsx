@@ -1,3 +1,4 @@
+import { useSafeNavigation } from '@/hooks/use-safe-navigation';
 import { colors, spacing } from '@/lib/constants/colors';
 import { signupSchema, type SignupFormData } from '@/schema/auth-schema';
 import { useAuthStore } from '@/stores/auth-store';
@@ -11,6 +12,7 @@ import { Input } from '../ui/input';
 export function SignupForm() {
   const router = useRouter();
   const signUp = useAuthStore((state) => state.signUp);
+  const {navigateSafely} = useSafeNavigation();
   
   const {
     control,
@@ -26,15 +28,15 @@ export function SignupForm() {
     },
   });
 
-  const onSubmit = async (data: SignupFormData) => {
-    const { error } = await signUp(data.email, data.password);
-    
-    if (error) {
-      setError('root', { message: error.message });
-    } else {
-      router.replace('/(tabs)');
-    }
-  };
+    const onSubmit = async (data: SignupFormData) => {
+        const { error } = await signUp(data.email, data.password);
+        
+        if (error) {
+        setError('root', { message: error.message });
+        } else {
+            navigateSafely('/(tabs)');
+        }
+    };
 
   return (
     <View style={styles.form}>

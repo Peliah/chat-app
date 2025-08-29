@@ -1,11 +1,12 @@
-// app/_layout.tsx
+// app/_layout.tsx (updated)
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { AuthProvider } from '../components/auth/auth-provider';
 import { colors } from '../lib/constants/colors';
 import { useAuthStore } from '../stores/auth-store';
 
-export default function RootLayout() {
+function RootLayoutNav() {
   const { session, isLoading } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
@@ -24,9 +25,10 @@ export default function RootLayout() {
     if (!isNavigationReady || isLoading) return;
 
     const inAuthGroup = segments[0] === 'auth';
+    const inTabsGroup = segments[0] === '(tabs)';
     
+    // Only navigate if we're not already on the correct screen
     if (!session && !inAuthGroup) {
-      // Replace instead of push to avoid back navigation issues
       router.replace('/auth/login');
     } else if (session && inAuthGroup) {
       router.replace('/(tabs)');
@@ -48,5 +50,13 @@ export default function RootLayout() {
       <Stack.Screen name="chat-room/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="subscription/gate" options={{ headerShown: false }} />
     </Stack>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <RootLayoutNav />
+    </AuthProvider>
   );
 }

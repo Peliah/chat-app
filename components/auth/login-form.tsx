@@ -1,3 +1,4 @@
+import { useSafeNavigation } from '@/hooks/use-safe-navigation';
 import { colors, spacing } from '@/lib/constants/colors';
 import { loginSchema, type LoginFormData } from '@/schema/auth-schema';
 import { useAuthStore } from '@/stores/auth-store';
@@ -9,31 +10,33 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
 export function LoginForm() {
-  const router = useRouter();
-  const signIn = useAuthStore((state) => state.signIn);
-  
-  const {
-    control,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    setError,
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
-  });
-
-  const onSubmit = async (data: LoginFormData) => {
-    const { error } = await signIn(data.email, data.password);
+    const router = useRouter();
+    const signIn = useAuthStore((state) => state.signIn);
+  const {navigateSafely} = useSafeNavigation();
     
-    if (error) {
-      setError('root', { message: error.message });
-    } else {
-      router.replace('/(tabs)');
-    }
-  };
+    const {
+        control,
+        handleSubmit,
+        formState: { errors, isSubmitting },
+        setError,
+    } = useForm<LoginFormData>({
+        resolver: zodResolver(loginSchema),
+        defaultValues: {
+        email: '',
+        password: '',
+        },
+    });
+
+
+    const onSubmit = async (data: LoginFormData) => {
+        const { error } = await signIn(data.email, data.password);
+        
+        if (error) {
+        setError('root', { message: error.message });
+        } else {
+            navigateSafely('/(tabs)');
+        }
+    };
 
   return (
     <View style={styles.form}>
